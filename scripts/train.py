@@ -4,8 +4,7 @@ from torchaudio.functional import spectrogram
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-
-
+from tqdm import tqdm
 
 device= f'cuda:0' if torch.cuda.is_available() else 'cpu' 
 def multiscale_spectral_loss(a_o,a_s) -> torch.Tensor:
@@ -38,7 +37,7 @@ def train(batch_size=32):
     decoder=models.decoder().to(device)
     optimiser=Adam(list(encoder.parameters())+list(decoder.parameters()),lr=0.001)
     scheduler = ExponentialLR(optimiser, gamma=0.98)
-    for epoch in range(100):
+    for epoch in tqdm(range(100)):
         for original_audio,f0,loudness,mfccs in dl:
             original_audio = original_audio.to(device)
             f0 = f0.to(device)
