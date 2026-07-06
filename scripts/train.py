@@ -5,13 +5,14 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 from tqdm import tqdm
+import os
 
 device= f'cuda:0' if torch.cuda.is_available() else 'cpu' 
 def multiscale_spectral_loss(a_o,a_s) -> torch.Tensor:
     # spectrogram returns tensors of shape: 
     # (..., freq, time), freq is n_fft // 2 + 1 and n_fft is the number of Fourier bins, and time is the number of window hops (n_frame).
     fft_list=[2048,1024,512,256,128,64] # multiscale because of varying resolution
-    total_loss=0.0
+    total_loss = torch.tensor(0.0, device=a_o.device)
     for fft_size in fft_list:
         window=torch.hann_window(fft_size).to(a_o.device)
         S = spectrogram(a_o,pad=0,window=window,n_fft=fft_size,hop_length=fft_size//4,win_length=fft_size,power=1,normalized=False) # (32,1025,)
@@ -27,8 +28,8 @@ def multiscale_spectral_loss(a_o,a_s) -> torch.Tensor:
 
 
 def train(batch_size=32):
-    data= dataset.DDSPDataset('/home/hasi/ddsp/data/f0_loudness_mfccs.pt')
-    dl = DataLoader(data,batch_size,shuffle=True)
+    data= dataset.DDSPDataset('/ddsp/data/f0_loudness_mfccs.pt')
+    dl = DataLoader(data,batch_size,shuffle=True,pin_memory=True,num_workers=4)
     # f0,loudness,mfccs= next(iter(dl))
     # print(f'f0 shape: {f0.shape} ')
     # print(f'loudness shape: {loudness.shape} ')
@@ -58,7 +59,7 @@ def train(batch_size=32):
             loss.backward()
             optimiser.step()
         scheduler.step()
-        print(f"Epoch {epoch+1}/100 Completed. Final Batch Loss: {loss.item():.4f}")
+        tqdm.write(f"Epoch {epoch+1}/100 Completed. Final Batch Loss: {loss.item():.4f}")
             
         if (epoch + 1) % 10 == 0:
             checkpoint = {
@@ -68,10 +69,11 @@ def train(batch_size=32):
                 'optimizer_state_dict': optimiser.state_dict(),
                 'loss': loss.item()
             }
+            os.makedirs('checkpoints',exist_ok=True)
             torch.save(checkpoint, f'checkpoints/ddsp_epoch_{epoch+1}.pt')
-            print(f"--> Saved checkpoint to checkpoints/ddsp_epoch_{epoch+1}.pt")
+            tqdm.write(f"--> Saved checkpoint to checkpoints/ddsp_epoch_{epoch+1}.pt")
         
     
 
-
-train()
+if __name__ == '__main__':
+    train()
